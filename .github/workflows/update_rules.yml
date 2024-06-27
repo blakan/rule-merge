@@ -2,8 +2,8 @@ name: Update Clash Rules
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 时间 00:00 运行
-  workflow_dispatch:  # 允许手动触发
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   update-rules:
@@ -24,9 +24,11 @@ jobs:
     - name: Run rule merge script
       run: python rule_merge.py
 
-    - name: Commit and push if changed
+    - name: Update Gist
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GIST_ID: YOUR_GIST_ID_HERE
       run: |
-        git config --global user.email "action@github.com"
-        git config --global user.name "GitHub Action"
-        git add *.txt *.conf
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Update rules" && git push)
+        for file in *.txt *.conf; do
+          gh gist edit $GIST_ID "$file"="$file"
+        done

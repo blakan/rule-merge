@@ -9,17 +9,11 @@ jobs:
   update-rules:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
+    - uses: actions/checkout@v3  # 使用兼容 Node.js 20 的版本
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install requests pyyaml
+        npm install request pyyaml  # 使用 npm 安装依赖库
 
     - name: Run rule merge script
       run: python rule_merge.py

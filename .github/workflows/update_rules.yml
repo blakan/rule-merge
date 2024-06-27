@@ -27,8 +27,8 @@ jobs:
     - name: Update Gist
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        GIST_ID: YOUR_GIST_ID_HERE
+        GIST_ID: e69dbfafe8e9f164df62212079489671
       run: |
-        for file in *.txt *.conf; do
+        for file in Proxy.txt Direct.txt Reject.txt Ai.txt Proxy.conf Direct.conf Reject.conf Ai.conf; do
           gh gist edit $GIST_ID "$file"="$file"
         done

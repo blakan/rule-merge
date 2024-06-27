@@ -9,20 +9,21 @@ jobs:
   update-rules:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3  # 使用兼容 Node.js 20 的版本
+      - uses: actions/checkout@v3
 
-    - name: Install dependencies
-      run: |
-        npm install request pyyaml  # 使用 npm 安装依赖库
+      - name: Install dependencies
+        run: |
+          npm install request
+          pip install pyyaml
 
-    - name: Run rule merge script
-      run: python rule_merge.py
+      - name: Run rule merge script
+        run: python rule_merge.py
 
-    - name: Update Gist
-      env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        GIST_ID: e69dbfafe8e9f164df62212079489671
-      run: |
-        for file in Proxy.txt Direct.txt Reject.txt Ai.txt Proxy.conf Direct.conf Reject.conf Ai.conf; do
-      gh gist edit $GIST_ID --filename="$file" "$file"
-        done
+      - name: Update Gist
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GIST_ID: e69dbfafe8e9f164df62212079489671
+        run: |
+          for file in Proxy.txt Direct.txt Reject.txt Ai.txt Proxy.conf Direct.conf Reject.conf Ai.conf; do
+            gh gist edit $GIST_ID --filename="$file" "$file"
+          done

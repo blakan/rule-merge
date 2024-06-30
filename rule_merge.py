@@ -17,9 +17,10 @@ def parse_rules(content, file_format):
         for line in content.splitlines():
             line = line.strip()
             if line and not line.startswith('#'):
-                # 保留完整的规则格式
                 rules['payload'].append(line)
         return rules
+    else:
+        raise ValueError(f"Unsupported file format: {file_format}")
 
 def merge_rules(rule_sets):
     merged = {'payload': set()}
@@ -33,7 +34,6 @@ def save_rules_txt(rules, output_file):
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write("payload:\n")
         for rule in rules.get('payload', []):
-            # 提取域名部分
             if ',' in rule:
                 parts = rule.split(',')
                 if len(parts) >= 2:
@@ -43,22 +43,51 @@ def save_rules_txt(rules, output_file):
             else:
                 domain = rule
             
-            # 确保域名前有 '+.' 前缀
-            if not domain.startswith('+.') and not domain.startswith('DOMAIN'):
-                domain = f'+.{domain}'
+            if domain.startswith('+.'):
+                domain = domain[2:]  # 去掉前缀的 '+.'
             
             f.write(f"  - '{domain}'\n")
 
-def save_rules_conf(rules, output_file):
+def save_merged_rules_conf(rule_sets_config, output_file):
     with open(output_file, 'w', encoding='utf-8') as f:
-        f.write("[Rule]\n")
-        for rule in rules.get('payload', []):
-            if ',' in rule:
-                f.write(f"{rule},PROXY\n")
-            elif rule.startswith('+.'):
-                f.write(f"DOMAIN-SUFFIX,{rule[2:]},PROXY\n")
-            else:
-                f.write(f"DOMAIN-SUFFIX,{rule},PROXY\n")
+        for output_name, rule_urls in rule_sets_config.items():
+            rule_sets = []
+            for url in rule_urls:
+                try:
+                    content = download_rules(url)
+                    file_format = get_file_format(url)
+                    rules = parse_rules(content, file_format)
+                    rule_sets.append(rules)
+                except Exception as e:
+                    print(f"Error processing {url}: {str(e)}")
+                    continue
+            
+            if not rule_sets:
+                print(f"No valid rules found for {output_name}. Skipping.")
+                continue
+
+            merged_rules = merge_rules(rule_sets)
+            
+            for rule in merged_rules.get('payload', []):
+                if ',' in rule:
+                    parts = rule.split(',')
+                    if len(parts) >= 2:
+                        domain = parts[1]
+                    else:
+                        domain = rule
+                else:
+                    domain = rule
+                
+                if domain.startswith('+.'):
+                    domain = domain[2:]  # 去掉前缀的 '+.'
+                
+                # 判断是否为AI链接，如果是则类型为PROXY
+                if 'ai_link' in domain:
+                    rule_type = 'PROXY'
+                else:
+                    rule_type = output_name.upper()  # 默认类型为配置名称的大写形式
+                
+                f.write(f"DOMAIN-SUFFIX,{domain},{rule_type}\n")
 
 def get_file_format(url):
     path = urlparse(url).path
@@ -95,6 +124,12 @@ def main():
         ],
     }
 
+    # 生成合并的 .conf 文件
+    merged_conf_file = "merged_rules.conf"
+    save_merged_rules_conf(rule_sets_config, merged_conf_file)
+    print(f"Generated {merged_conf_file}")
+
+    # 生成单独的 .txt 文件
     for output_name, rule_urls in rule_sets_config.items():
         rule_sets = []
         for url in rule_urls:
@@ -113,15 +148,10 @@ def main():
 
         merged_rules = merge_rules(rule_sets)
         
-        # Save as .txt
+        # 保存文件
         txt_output_file = f"{output_name}.txt"
         save_rules_txt(merged_rules, txt_output_file)
         print(f"Generated {txt_output_file}")
-        
-        # Save as .conf
-        conf_output_file = f"{output_name}.conf"
-        save_rules_conf(merged_rules, conf_output_file)
-        print(f"Generated {conf_output_file}")
 
 if __name__ == "__main__":
     main()

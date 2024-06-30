@@ -1,7 +1,6 @@
 import requests
 import yaml
 import os
-import sys
 from collections import OrderedDict
 from urllib.parse import urlparse
 
@@ -41,40 +40,6 @@ def merge_rules(rule_sets):
     merged['payload'] = sorted(merged['payload'])
     return merged
 
-def save_rules_txt(rules, output_file):
-    try:
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write("payload:\n")
-            for rule in rules.get('payload', []):
-                domain = process_domain(rule)
-                if domain:
-                    f.write(f"  - '{domain}'\n")
-        print(f"Generated {output_file}")
-    except IOError as e:
-        print(f"Error writing to {output_file}: {e}", file=sys.stderr)
-
-def save_merged_rules_conf(rule_sets_config, output_file):
-    try:
-        with open(output_file, 'w', encoding='utf-8') as f:
-            for output_name, rule_urls in rule_sets_config.items():
-                rule_sets = []
-                for url in rule_urls:
-                    content = download_rules(url)
-                    file_format = get_file_format(url)
-                    rules = parse_rules(content, file_format)
-                    rule_sets.append(rules)
-                
-                merged_rules = merge_rules(rule_sets)
-                
-                for rule in merged_rules.get('payload', []):
-                    domain = process_domain(rule)
-                    if domain:
-                        rule_type = 'PROXY' if 'ai_link' in domain.lower() else output_name.upper()
-                        f.write(f"DOMAIN-SUFFIX,{domain},{rule_type}\n")
-        print(f"Generated {output_file}")
-    except IOError as e:
-        print(f"Error writing to {output_file}: {e}", file=sys.stderr)
-        
 def process_domain(rule):
     if not isinstance(rule, str):
         return ''
@@ -105,25 +70,45 @@ def process_domain(rule):
 
     return domain
 
-# 测试函数
-def test_process_domain():
-    test_cases = [
-        "  - '+.test.org,  ",
-        "'+.cnyes.com",
-        "'-+.example.com'",
-        "'+.-+.complex-example.net,'",
-        "3dns-1.adobe.com",
-        "'normal.domain.com'",
-    ]
-    
-    for case in test_cases:
-        result = process_domain(case)
-        print(f"Original: {case}")
-        print(f"Processed: {result}")
-        print()
+def save_rules_txt(rules, output_file):
+    try:
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write("payload:\n")
+            for rule in rules.get('payload', []):
+                domain = process_domain(rule)
+                if domain:
+                    f.write(f"  - '{domain}'\n")
+        print(f"Generated {output_file}")
+    except IOError as e:
+        print(f"Error writing to {output_file}: {e}", file=sys.stderr)
 
-# 运行测试
-test_process_domain()
+def save_merged_rules_conf(rule_sets_config, output_file, custom_proxy_domains, custom_direct_domains):
+    try:
+        with open(output_file, 'w', encoding='utf-8') as f:
+            for output_name, rule_urls in rule_sets_config.items():
+                rule_sets = []
+                for url in rule_urls:
+                    content = download_rules(url)
+                    file_format = get_file_format(url)
+                    rules = parse_rules(content, file_format)
+                    rule_sets.append(rules)
+                
+                merged_rules = merge_rules(rule_sets)
+
+                # 添加自定义域名
+                if output_name == "Proxy":
+                    merged_rules = add_custom_domains(merged_rules, custom_proxy_domains)
+                elif output_name == "Direct":
+                    merged_rules = add_custom_domains(merged_rules, custom_direct_domains)
+                
+                for rule in merged_rules.get('payload', []):
+                    domain = process_domain(rule)
+                    if domain:
+                        rule_type = output_name.upper()
+                        f.write(f"DOMAIN-SUFFIX,{domain},{rule_type}\n")
+        print(f"Generated {output_file}")
+    except IOError as e:
+        print(f"Error writing to {output_file}: {e}", file=sys.stderr)
 
 def get_file_format(url):
     path = urlparse(url).path
@@ -135,11 +120,22 @@ def get_file_format(url):
     else:
         raise ValueError(f"Unsupported file format: {extension}")
 
-def ensure_files_exist(file_names):
-    for file_name in file_names:
-        if not os.path.exists(file_name):
-            open(file_name, 'a').close()
-            print(f"Created empty file: {file_name}")
+def read_custom_domains(file_path):
+    if not os.path.exists(file_path):
+        print(f"Info: Custom domain file {file_path} does not exist. Skipping.")
+        return []
+    
+    try:
+        with open(file_path, 'r') as f:
+            return [line.strip() for line in f if line.strip() and not line.startswith('#')]
+    except IOError:
+        print(f"Warning: Could not read {file_path}. Skipping custom domains.")
+        return []
+
+def add_custom_domains(rules, custom_domains):
+    if custom_domains:
+        rules['payload'].extend(custom_domains)
+    return rules
 
 def main():
     rule_sets_config = {
@@ -166,23 +162,39 @@ def main():
         ],
     }
 
-    # 确保所有文件存在
-    ensure_files_exist(['Proxy.txt', 'Direct.txt', 'Reject.txt', 'Ai.txt', 'merged_rules.conf'])
+    # 读取自定义域名
+    custom_proxy_domains = read_custom_domains('custom_proxy.txt')
+    custom_direct_domains = read_custom_domains('custom_direct.txt')
 
-    # 生成合并的 .conf 文件
-    save_merged_rules_conf(rule_sets_config, "merged_rules.conf")
-
-    # 生成单独的 .txt 文件
+    # 处理规则并整合自定义域名
     for output_name, rule_urls in rule_sets_config.items():
         rule_sets = []
         for url in rule_urls:
             content = download_rules(url)
-            file_format = get_file_format(url)
-            rules = parse_rules(content, file_format)
-            rule_sets.append(rules)
+            if content:
+                file_format = get_file_format(url)
+                rules = parse_rules(content, file_format)
+                rule_sets.append(rules)
         
+        if not rule_sets:
+            print(f"No valid rules found for {output_name}. Skipping.")
+            continue
+
         merged_rules = merge_rules(rule_sets)
-        save_rules_txt(merged_rules, f"{output_name}.txt")
+
+        # 添加自定义域名
+        if output_name == "Proxy":
+            merged_rules = add_custom_domains(merged_rules, custom_proxy_domains)
+        elif output_name == "Direct":
+            merged_rules = add_custom_domains(merged_rules, custom_direct_domains)
+
+        # 保存文件
+        txt_output_file = f"{output_name}.txt"
+        save_rules_txt(merged_rules, txt_output_file)
+
+    # 生成合并的 .conf 文件
+    merged_conf_file = "merged_rules.conf"
+    save_merged_rules_conf(rule_sets_config, merged_conf_file, custom_proxy_domains, custom_direct_domains)
 
 if __name__ == "__main__":
     main()

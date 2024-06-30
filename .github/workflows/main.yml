@@ -1,0 +1,38 @@
+name: Update Clash Rules
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          npm install request
+          pip install pyyaml
+      - name: Run rule merge script
+        run: python rule_merge.py
+      - name: Ensure all files exist
+        run: |
+          for file in Proxy.txt Direct.txt Reject.txt Ai.txt Proxy.conf Direct.conf Reject.conf Ai.conf; do
+            touch "$file"
+          done
+      - name: Commit and push if changed
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git add -A
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update rules" && git push)
+      - name: Update README with fixed URLs
+        run: |
+          echo "## Fixed URLs" > README.md
+          echo "Last updated: $(date -u)" >> README.md
+          for file in Proxy.txt Direct.txt Reject.txt Ai.txt Proxy.conf Direct.conf Reject.conf Ai.conf; do
+            echo "- $file: https://raw.githubusercontent.com/${{ github.repository }}/main/$file" >> README.md
+          done
+          git add README.md
+          git commit -m "Update README with fixed URLs" || true
+          git push

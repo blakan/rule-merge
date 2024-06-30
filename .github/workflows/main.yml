@@ -17,7 +17,7 @@ jobs:
         run: python rule_merge.py
       - name: Ensure all files exist
         run: |
-          for file in Proxy.txt Direct.txt Reject.txt Ai.txt Proxy.conf Direct.conf Reject.conf Ai.conf; do
+          for file in Proxy.txt Direct.txt Reject.txt Ai.txt merged_rules.conf; do
             touch "$file"
           done
       - name: Commit and push if changed
@@ -30,7 +30,7 @@ jobs:
         run: |
           echo "## Fixed URLs" > README.md
           echo "Last updated: $(date -u)" >> README.md
-          for file in Proxy.txt Direct.txt Reject.txt Ai.txt Proxy.conf Direct.conf Reject.conf Ai.conf; do
+          for file in Proxy.txt Direct.txt Reject.txt Ai.txt merged_rules.conf; do
             echo "- $file: https://raw.githubusercontent.com/${{ github.repository }}/main/$file" >> README.md
           done
           git add README.md

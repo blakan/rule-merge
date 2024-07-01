@@ -1,3 +1,6 @@
+# 对于普通域名，直接写入域名，如：example.com
+# 对于关键字规则，添加 DOMAIN-KEYWORD, 前缀，如：DOMAIN-KEYWORD,example
+# 对于后缀规则，添加 DOMAIN-SUFFIX, 前缀，如：DOMAIN-SUFFIX,example.com
 一分机场.com
 freembook.com
 superlib.net
@@ -11,20 +14,11 @@ huggingface.co
 lmsys.org
 naiko.cloud
 anthropic.com
-auth0.com
-sentry.io
-identrust.com
-openaiapi-site.azureedge.net
-challenges.cloudflare.com
-invoice.stripe.com
 stripe.com
 poe.com
 bard.google.com
 claude.ai
 gemini.google.com
- - DOMAIN-KEYWORD,openai,美服
-  - DOMAIN-KEYWORD,chatgpt,美服
-  - DOMAIN-KEYWORD,kiomet,♻️ 自动选择
-  - DOMAIN-KEYWORD,terobox,♻️ 自动选择
-  - DOMAIN-KEYWORD,xfltd,♻️ 自动选择
-
+DOMAIN-KEYWORD,kiomet
+DOMAIN-KEYWORD,terobox
+DOMAIN-KEYWORD,xfltd

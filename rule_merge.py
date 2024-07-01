@@ -51,8 +51,8 @@ def process_rule(rule):
         rule_type, domain = original_rule.split(',', 1)
         return rule_type.lower().split('-')[-1], domain.strip()
     
-    # 初始化规则类型为 domain
-    rule_type = 'domain'
+    # 初始化规则类型为 suffix（默认使用 DOMAIN-SUFFIX）
+    rule_type = 'suffix'
     
     # 循环处理前缀，直到没有变化为止
     while True:
@@ -73,7 +73,6 @@ def process_rule(rule):
         return '', ''
     
     return rule_type, rule
-
 
 def merge_rules_with_priority(custom_rules, third_party_rules):
     merged = {'payload': []}
@@ -135,14 +134,15 @@ def save_merged_rules_conf(rule_sets_config, output_file, custom_proxy_domains, 
                         
                         if rule_type == 'keyword':
                             f.write(f"DOMAIN-KEYWORD,{processed_rule},{conf_type}\n")
-                        elif rule_type == 'suffix':
-                            f.write(f"DOMAIN-SUFFIX,{processed_rule},{conf_type}\n")
-                        else:
+                        elif rule_type == 'domain':
                             f.write(f"DOMAIN,{processed_rule},{conf_type}\n")
+                        else:
+                            # 默认使用 DOMAIN-SUFFIX
+                            f.write(f"DOMAIN-SUFFIX,{processed_rule},{conf_type}\n")
         print(f"Generated {output_file}")
     except IOError as e:
         print(f"Error writing to {output_file}: {e}", file=sys.stderr)
-        
+
 def get_file_format(url):
     path = urlparse(url).path
     extension = os.path.splitext(path)[1].lower()

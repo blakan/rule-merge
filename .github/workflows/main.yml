@@ -28,7 +28,8 @@ jobs:
       - name: Update README with fixed URLs
         run: |
           echo "## Fixed URLs" > README.md
-          echo "Last updated: $(date -u)" >> README.md
+          beijing_time=$(TZ='Asia/Shanghai' date '+%Y年%m月%d日%H时%M分%S秒')
+          echo "更新于北京时间 $beijing_time" >> README.md
           for file in Proxy.txt Direct.txt Reject.txt Ai.txt merged_rules.conf; do
             echo "- $file: https://raw.githubusercontent.com/${{ github.repository }}/main/$file" >> README.md
           done

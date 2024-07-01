@@ -40,44 +40,68 @@ def merge_rules(rule_sets):
     merged['payload'] = sorted(merged['payload'])
     return merged
 
-def process_domain(rule):
+def process_rule(rule):
     if not isinstance(rule, str):
-        return ''
+        return '', ''
 
-    # 移除所有引号和首尾空白字符
-    domain = rule.strip()
+    original_rule = rule.strip()
     
-    # 移除开头的破折号和空格
-    domain = domain.lstrip('- ')
-
-    # 移除开头和结尾的引号
-    domain = domain.strip("'\"")
+    # 检查是否为特定类型的规则
+    if original_rule.startswith(('DOMAIN-KEYWORD,', 'DOMAIN-SUFFIX,', 'DOMAIN,')):
+        rule_type, domain = original_rule.split(',', 1)
+        return rule_type.lower().split('-')[-1], domain.strip()
     
-    # 循环处理，直到没有变化为止
+    # 初始化规则类型为 domain
+    rule_type = 'domain'
+    
+    # 循环处理前缀，直到没有变化为止
     while True:
-        new_domain = domain
-        # 移除开头的 '+.', '-', '+', '.' 等字符
-        new_domain = new_domain.lstrip('+.-')
-        # 移除结尾的 ',' 等字符
-        new_domain = new_domain.rstrip(',')
-        # 再次去除首尾空白和引号
-        new_domain = new_domain.strip().strip("'\"")
+        new_rule = rule.lstrip('+-. ')
+        new_rule = new_rule.strip("'\"")
         
-        # 如果处理后的域名没有变化，说明已经清理完毕
-        if new_domain == domain:
+        # 如果规则没有变化，跳出循环
+        if new_rule == rule:
             break
-        domain = new_domain
+        
+        rule = new_rule
+    
+    # 移除可能的注释（以 # 开始）
+    rule = rule.split('#')[0].strip()
+    
+    # 如果规则为空，返回空值
+    if not rule:
+        return '', ''
+    
+    return rule_type, rule
 
-    return domain
 
+def merge_rules_with_priority(custom_rules, third_party_rules):
+    merged = {'payload': []}
+    custom_set = set(custom_rules)
+    
+    for rule in custom_rules:
+        merged['payload'].append(rule)
+    
+    for rule in third_party_rules:
+        rule_type, processed_rule = process_rule(rule)
+        if processed_rule not in custom_set:
+            merged['payload'].append(rule)
+
+    return merged
+        
 def save_rules_txt(rules, output_file):
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write("payload:\n")
             for rule in rules.get('payload', []):
-                domain = process_domain(rule)
-                if domain:
-                    f.write(f"  - '{domain}'\n")
+                rule_type, processed_rule = process_rule(rule)
+                if processed_rule:
+                    if rule_type == 'keyword':
+                        f.write(f"  - DOMAIN-KEYWORD,{processed_rule}\n")
+                    elif rule_type == 'suffix':
+                        f.write(f"  - DOMAIN-SUFFIX,{processed_rule}\n")
+                    else:
+                        f.write(f"  - '{processed_rule}'\n")
         print(f"Generated {output_file}")
     except IOError as e:
         print(f"Error writing to {output_file}: {e}", file=sys.stderr)
@@ -95,21 +119,30 @@ def save_merged_rules_conf(rule_sets_config, output_file, custom_proxy_domains, 
                 
                 merged_rules = merge_rules(rule_sets)
 
-                # 添加自定义域名
+                # 处理自定义规则
                 if output_name == "Proxy":
-                    merged_rules = add_custom_domains(merged_rules, custom_proxy_domains)
+                    merged_rules = merge_rules_with_priority(custom_proxy_domains, merged_rules['payload'])
                 elif output_name == "Direct":
-                    merged_rules = add_custom_domains(merged_rules, custom_direct_domains)
+                    merged_rules = merge_rules_with_priority(custom_direct_domains, merged_rules['payload'])
                 
                 for rule in merged_rules.get('payload', []):
-                    domain = process_domain(rule)
-                    if domain:
-                        rule_type = output_name.upper()
-                        f.write(f"DOMAIN-SUFFIX,{domain},{rule_type}\n")
+                    rule_type, processed_rule = process_rule(rule)
+                    if processed_rule:
+                        if output_name == "Ai":
+                            conf_type = "PROXY"
+                        else:
+                            conf_type = output_name.upper()
+                        
+                        if rule_type == 'keyword':
+                            f.write(f"DOMAIN-KEYWORD,{processed_rule},{conf_type}\n")
+                        elif rule_type == 'suffix':
+                            f.write(f"DOMAIN-SUFFIX,{processed_rule},{conf_type}\n")
+                        else:
+                            f.write(f"DOMAIN,{processed_rule},{conf_type}\n")
         print(f"Generated {output_file}")
     except IOError as e:
         print(f"Error writing to {output_file}: {e}", file=sys.stderr)
-
+        
 def get_file_format(url):
     path = urlparse(url).path
     extension = os.path.splitext(path)[1].lower()
@@ -132,10 +165,7 @@ def read_custom_domains(file_path):
         print(f"Warning: Could not read {file_path}. Skipping custom domains.")
         return []
 
-def add_custom_domains(rules, custom_domains):
-    if custom_domains:
-        rules['payload'].extend(custom_domains)
-    return rules
+
 
 def main():
     rule_sets_config = {
@@ -182,19 +212,21 @@ def main():
 
         merged_rules = merge_rules(rule_sets)
 
-        # 添加自定义域名
+        # 使用新的合并函数，确保自定义规则优先
         if output_name == "Proxy":
-            merged_rules = add_custom_domains(merged_rules, custom_proxy_domains)
+            merged_rules = merge_rules_with_priority(custom_proxy_domains, merged_rules['payload'])
         elif output_name == "Direct":
-            merged_rules = add_custom_domains(merged_rules, custom_direct_domains)
+            merged_rules = merge_rules_with_priority(custom_direct_domains, merged_rules['payload'])
+
 
         # 保存文件
         txt_output_file = f"{output_name}.txt"
-        save_rules_txt(merged_rules, txt_output_file)
+        save_rules_txt({'payload': merged_rules['payload']}, txt_output_file)
 
     # 生成合并的 .conf 文件
     merged_conf_file = "merged_rules.conf"
     save_merged_rules_conf(rule_sets_config, merged_conf_file, custom_proxy_domains, custom_direct_domains)
+
 
 if __name__ == "__main__":
     main()

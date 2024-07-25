@@ -181,7 +181,7 @@ def main():
             "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaCompanyIp.list",
             "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaIp.list",
             "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/LocalAreaNetwork.list",
-            "https://raw.githubusercontent.com/Aethersailor/Custom_OpenClash_Rules/main/Rule/Custom_Direct.list",
+            "https://github.com/Aethersailor/Custom_OpenClash_Rules/blob/main/rule/Custom_Direct.list",
         ],
         "Reject": [
             "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/reject.txt",

@@ -1,4 +1,5 @@
 name: Update Clash Rules
+
 on:
   schedule:
     - cron: '0 15 * * 0'
@@ -9,30 +10,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
       - name: Install dependencies
         run: |
           pip install requests pyyaml
+
       - name: Run rule merge script
         run: python rule_merge.py
+
       - name: Ensure all files exist
         run: |
           for file in Proxy.txt Direct.txt Reject.txt Ai.txt merged_rules.conf; do
             touch "$file"
           done
-      - name: Commit and push if changed
-        run: |
-          git config --global user.email "action@github.com"
-          git config --global user.name "GitHub Action"
-          git add -A
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update rules" && git push)
+
       - name: Update README with fixed URLs
         run: |
           echo "## Fixed URLs" > README.md
           beijing_time=$(TZ='Asia/Shanghai' date '+%Y年%m月%d日%H时%M分%S秒')
           echo "更新于北京时间 $beijing_time" >> README.md
           for file in Proxy.txt Direct.txt Reject.txt Ai.txt merged_rules.conf; do
-            echo "- $file: https://raw.githubusercontent.com/${{ github.repository }}/main/$file" >> README.md
+            echo "- $file: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/$file" >> README.md
           done
+
+      - name: Deploy to GitHub Pages
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git checkout --orphan gh-pages
+          git reset --hard
+          mv Proxy.txt Direct.txt Reject.txt Ai.txt merged_rules.conf README.md ./
+          git add .
+          git commit -m "Deploy to GitHub Pages"
+          git push -f origin gh-pages
+
+      - name: Commit changes to main branch
+        run: |
+          git checkout main
           git add README.md
-          git commit -m "Update README with fixed URLs" || true
-          git push
+          git commit -m "Update README with new URLs" || echo "No changes to commit"
+          git push origin main

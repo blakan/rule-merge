@@ -24,35 +24,19 @@ jobs:
             touch "$file"
           done
 
-      - name: Create a temporary directory
-        run: mkdir -p temp
-
-      - name: Move files to temp directory
+      - name: Update README with fixed URLs
         run: |
-          mv Proxy.txt Direct.txt Reject.txt Ai.txt merged_rules.conf README.md temp/ || echo "Some files are missing"
+          echo "## Fixed URLs" > README.md
+          beijing_time=$(TZ='Asia/Shanghai' date '+%Y年%m月%d日%H时%M分%S秒')
+          echo "更新于北京时间 $beijing_time" >> README.md
+          for file in Proxy.txt Direct.txt Reject.txt Ai.txt merged_rules.conf; do
+            echo "- $file: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/$file" >> README.md
+          done
 
-      - name: Deploy to GitHub Pages
+      - name: Commit and push changes to main branch
         run: |
           git config --global user.email "action@github.com"
           git config --global user.name "GitHub Action"
-          git checkout --orphan gh-pages
-          git reset --hard
-          mv temp/* ./
           git add .
-          git commit -m "Deploy to GitHub Pages"
-          git push -f origin gh-pages
-
-      - name: Switch back to main branch
-        run: git checkout main
-
-      - name: Copy README.md from gh-pages
-        run: cp temp/README.md ./
-
-      - name: Commit changes to main branch
-        run: |
-          git add README.md
-          git commit -m "Update README with new URLs" || echo "No changes to commit"
+          git commit -m "Update rules and README" || echo "No changes to commit"
           git push origin main
-
-      - name: Cleanup temp directory
-        run: rm -rf temp

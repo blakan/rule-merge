@@ -42,9 +42,14 @@ jobs:
           git commit -m "Deploy to GitHub Pages"
           git push -f origin gh-pages
 
+      - name: Switch back to main branch
+        run: git checkout main
+
+      - name: Copy README.md from gh-pages
+        run: cp temp/README.md ./
+
       - name: Commit changes to main branch
         run: |
-          git checkout main
           git add README.md
           git commit -m "Update README with new URLs" || echo "No changes to commit"
           git push origin main

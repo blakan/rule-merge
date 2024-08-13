@@ -1,6 +1,7 @@
 import requests
 import yaml
 import os
+import sys
 from collections import OrderedDict
 from urllib.parse import urlparse
 
@@ -8,10 +9,36 @@ def download_rules(url):
     try:
         response = requests.get(url)
         response.raise_for_status()
-        return response.text
+        content = response.text
+        print(f"Successfully downloaded rules from {url}")
+        print(f"Content sample: {content[:100]}...")  # 打印内容样本
+        return content
     except requests.RequestException as e:
         print(f"Error downloading {url}: {e}", file=sys.stderr)
         return None
+
+def process_rule(rule):
+    # 移除注释
+    rule = rule.split('#')[0].strip()
+    
+    # 如果规则为空，返回None
+    if not rule:
+        return None
+    
+    # 检查是否包含HTML标签或属性，如果有则跳过
+    if '<' in rule or '>' in rule or 'class=' in rule or 'data-' in rule:
+        return None
+    
+    # 如果规则以引号开始和结束，移除引号
+    if (rule.startswith("'") and rule.endswith("'")) or (rule.startswith('"') and rule.endswith('"')):
+        rule = rule[1:-1]
+    
+    # 如果规则已经以 '- ' 开头，直接返回
+    if rule.startswith('- '):
+        return rule
+    
+    # 否则，在规则前添加 '- '
+    return f"- {rule}"
 
 def parse_rules(content, file_format):
     if content is None:
@@ -31,79 +58,47 @@ def parse_rules(content, file_format):
     except Exception as e:
         print(f"Error parsing rules: {e}", file=sys.stderr)
         return {'payload': []}
-
+    
 def merge_rules(rule_sets):
-    merged = {'payload': set()}
+    merged = set()
     for rule_set in rule_sets:
-        merged['payload'].update(rule_set.get('payload', []))
+        for rule in rule_set.get('payload', []):
+            processed_rule = process_rule(rule)
+            if processed_rule:
+                merged.add(processed_rule)
     
-    merged['payload'] = sorted(merged['payload'])
-    return merged
+    print(f"Merged rules count: {len(merged)}")
+    print(f"Sample of merged rules: {list(merged)[:5]}")  # 打印一些合并后的规则样本
+    return {'payload': sorted(merged)}
 
-def process_rule(rule):
-    if not isinstance(rule, str):
-        return '', ''
-
-    original_rule = rule.strip()
-    
-    # 检查是否为特定类型的规则
-    if original_rule.startswith(('DOMAIN-KEYWORD,', 'DOMAIN-SUFFIX,', 'DOMAIN,')):
-        rule_type, domain = original_rule.split(',', 1)
-        return rule_type.lower().split('-')[-1], domain.strip()
-    
-    # 初始化规则类型为 suffix（默认使用 DOMAIN-SUFFIX）
-    rule_type = 'suffix'
-    
-    # 循环处理前缀，直到没有变化为止
-    while True:
-        new_rule = rule.lstrip('+-. ')
-        new_rule = new_rule.strip("'\"")
-        
-        # 如果规则没有变化，跳出循环
-        if new_rule == rule:
-            break
-        
-        rule = new_rule
-    
-    # 移除可能的注释（以 # 开始）
-    rule = rule.split('#')[0].strip()
-    
-    # 如果规则为空，返回空值
-    if not rule:
-        return '', ''
-    
-    return rule_type, rule
-
-def merge_rules_with_priority(custom_rules, third_party_rules):
-    merged = {'payload': []}
-    custom_set = set(custom_rules)
-    
-    for rule in custom_rules:
-        merged['payload'].append(rule)
-    
-    for rule in third_party_rules:
-        rule_type, processed_rule = process_rule(rule)
-        if processed_rule not in custom_set:
-            merged['payload'].append(rule)
-
-    return merged
-        
 def save_rules_txt(rules, output_file):
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write("payload:\n")
             for rule in rules.get('payload', []):
-                rule_type, processed_rule = process_rule(rule)
-                if processed_rule:
-                    if rule_type == 'keyword':
-                        f.write(f"  - DOMAIN-KEYWORD,{processed_rule}\n")
-                    elif rule_type == 'suffix':
-                        f.write(f"  - DOMAIN-SUFFIX,{processed_rule}\n")
-                    else:
-                        f.write(f"  - '{processed_rule}'\n")
-        print(f"Generated {output_file}")
+                f.write(f"{rule}\n")
+        print(f"Generated {output_file} with {len(rules.get('payload', []))} rules")
     except IOError as e:
         print(f"Error writing to {output_file}: {e}", file=sys.stderr)
+
+def merge_rules_with_priority(custom_rules, third_party_rules):
+    merged = set()
+    
+    # 添加自定义规则
+    for rule in custom_rules:
+        processed_rule = process_rule(rule)
+        if processed_rule:
+            merged.add(processed_rule)
+    
+    # 添加第三方规则（如果不在自定义规则中）
+    for rule in third_party_rules:
+        processed_rule = process_rule(rule)
+        if processed_rule and processed_rule not in merged:
+            merged.add(processed_rule)
+
+    print(f"Merged rules with priority count: {len(merged)}")
+    print(f"Sample of merged rules with priority: {list(merged)[:5]}")  # 打印一些合并后的规则样本
+    return {'payload': sorted(merged)}
 
 def save_merged_rules_conf(rule_sets_config, output_file, custom_proxy_domains, custom_direct_domains):
     try:
@@ -125,20 +120,7 @@ def save_merged_rules_conf(rule_sets_config, output_file, custom_proxy_domains, 
                     merged_rules = merge_rules_with_priority(custom_direct_domains, merged_rules['payload'])
                 
                 for rule in merged_rules.get('payload', []):
-                    rule_type, processed_rule = process_rule(rule)
-                    if processed_rule:
-                        if output_name == "Ai":
-                            conf_type = "PROXY"
-                        else:
-                            conf_type = output_name.upper()
-                        
-                        if rule_type == 'keyword':
-                            f.write(f"DOMAIN-KEYWORD,{processed_rule},{conf_type}\n")
-                        elif rule_type == 'domain':
-                            f.write(f"DOMAIN,{processed_rule},{conf_type}\n")
-                        else:
-                            # 默认使用 DOMAIN-SUFFIX
-                            f.write(f"DOMAIN-SUFFIX,{processed_rule},{conf_type}\n")
+                    f.write(f"{rule[2:]}\n")  # 移除开头的 '- '
         print(f"Generated {output_file}")
     except IOError as e:
         print(f"Error writing to {output_file}: {e}", file=sys.stderr)
@@ -165,8 +147,6 @@ def read_custom_domains(file_path):
         print(f"Warning: Could not read {file_path}. Skipping custom domains.")
         return []
 
-
-
 def main():
     rule_sets_config = {
         "Proxy": [
@@ -179,9 +159,8 @@ def main():
             "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Direct/Direct.list",            
             "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaDomain.list",
             "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaCompanyIp.list",
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaIp.list",
+        #    "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/ChinaIp.list",
             "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/LocalAreaNetwork.list",
-            "https://github.com/Aethersailor/Custom_OpenClash_Rules/blob/main/rule/Custom_Direct.list",
         ],
         "Reject": [
             "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/reject.txt",
@@ -198,30 +177,34 @@ def main():
 
     # 处理规则并整合自定义域名
     for output_name, rule_urls in rule_sets_config.items():
+        print(f"\nProcessing {output_name} rules:")
         rule_sets = []
-        for url in rule_urls:
-            content = download_rules(url)
-            if content:
-                file_format = get_file_format(url)
-                rules = parse_rules(content, file_format)
-                rule_sets.append(rules)
-        
-        if not rule_sets:
-            print(f"No valid rules found for {output_name}. Skipping.")
-            continue
+    for url in rule_urls:
+        content = download_rules(url)
+        if content:
+            file_format = get_file_format(url)
+            rules = parse_rules(content, file_format)
+            rule_sets.append(rules)
+            print(f"  Added {len(rules['payload'])} rules from {url}")
+    
+    if not rule_sets:
+        print(f"No valid rules found for {output_name}. Skipping.")
+        return
 
-        merged_rules = merge_rules(rule_sets)
+    merged_rules = merge_rules(rule_sets)
+    print(f"Merged rules count before priority: {len(merged_rules['payload'])}")
 
-        # 使用新的合并函数，确保自定义规则优先
-        if output_name == "Proxy":
-            merged_rules = merge_rules_with_priority(custom_proxy_domains, merged_rules['payload'])
-        elif output_name == "Direct":
-            merged_rules = merge_rules_with_priority(custom_direct_domains, merged_rules['payload'])
+    # 使用新的合并函数，确保自定义规则优先
+    if output_name == "Proxy":
+        merged_rules = merge_rules_with_priority(custom_proxy_domains, merged_rules['payload'])
+    elif output_name == "Direct":
+        merged_rules = merge_rules_with_priority(custom_direct_domains, merged_rules['payload'])
 
+    print(f"Final merged rules count: {len(merged_rules['payload'])}")
 
-        # 保存文件
-        txt_output_file = f"{output_name}.txt"
-        save_rules_txt({'payload': merged_rules['payload']}, txt_output_file)
+    # 保存文件
+    txt_output_file = f"{output_name}.txt"
+    save_rules_txt(merged_rules, txt_output_file)
 
     # 生成合并的 .conf 文件
     merged_conf_file = "merged_rules.conf"

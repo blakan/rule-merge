@@ -1,24 +1,20 @@
-# 对于普通域名，直接写入域名，如：example.com
-# 对于关键字规则，添加 DOMAIN-KEYWORD, 前缀，如：DOMAIN-KEYWORD,example
-# 对于后缀规则，添加 DOMAIN-SUFFIX, 前缀，如：DOMAIN-SUFFIX,example.com
-一分机场.com
-freembook.com
-superlib.net
-ylibrary.org
-zhelper.net
-naritech.cn
-annas-archive.org
-iea-pvps.org
-v2rayssr.com
-huggingface.co
-lmsys.org
-naiko.cloud
-anthropic.com
-stripe.com
-poe.com
-bard.google.com
-claude.ai
-gemini.google.com
-DOMAIN-KEYWORD,kiomet
-DOMAIN-KEYWORD,terobox
-DOMAIN-KEYWORD,xfltd
+  - '+.一分机场.com'
+  - '+.freembook.com'
+  - '+.superlib.net'
+  - '+.freembook.com'
+  - '+.ylibrary.org'
+  - '+.zhelper.net'
+  - '+.naritech.cn'
+  - '+.annas-archive.org'
+  - '+.iea-pvps.org'
+  - '+.v2rayssr.com'
+  - '+.huggingface.co'
+  - '+.lmsys.org'
+  - '+.naiko.cloud'
+  - '+.anthropic.com'
+  - '+.stripe.com'
+  - '+.poe.com'
+  - '+.bard.google.com'
+  - '+.claude.ai'
+  - '+.gemini.google.com'
+  - '+.poe.com'

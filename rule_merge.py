@@ -6,6 +6,9 @@ from collections import OrderedDict
 from urllib.parse import urlparse
 import concurrent.futures
 
+def get_script_dir():
+    return os.path.dirname(os.path.realpath(__file__))
+
 def download_rules(url):
     try:
         response = requests.get(url, timeout=30)
@@ -58,12 +61,11 @@ def convert_list_to_txt(rule):
     return None
 
 def convert_txt_to_conf(rule):
-    if rule.startswith("- '"):
-        domain = rule[3:-1]
-        return f"DOMAIN,{domain},PROXY"
-    elif rule.startswith("- '+."):
-        domain = rule[5:-1]
+    if rule.startswith("- '+."):
+        domain = rule[5:-1] if rule.endswith("'") else rule[5:]
         return f"DOMAIN-SUFFIX,{domain},PROXY"
+    elif rule.startswith("DOMAIN-SUFFIX,") or rule.startswith("DOMAIN,") or rule.startswith("DOMAIN-KEYWORD,"):
+        return f"{rule},PROXY"
     return rule
 
 def get_file_format(url):
@@ -74,32 +76,83 @@ def get_file_format(url):
     else:
         raise ValueError(f"Unsupported file format: {extension}")
 
-def read_custom_rules(file_path):
+def read_custom_rules(file_name):
+    file_path = os.path.join(get_script_dir(), file_name)
     if not os.path.exists(file_path):
         print(f"Custom rule file {file_path} not found.")
-        return []
+        return {'direct': [], 'proxy': [], 'ai': []}
+    
+    custom_rules = {'direct': [], 'proxy': [], 'ai': []}
+    current_category = None
+    
     with open(file_path, 'r', encoding='utf-8') as f:
-        return [line.strip() for line in f if line.strip() and not line.startswith('#')]
+        for line in f:
+            line = line.strip()
+            if line.startswith('#'):
+                if 'direct' in line.lower():
+                    current_category = 'direct'
+                elif 'proxy' in line.lower():
+                    current_category = 'proxy'
+                elif 'ai' in line.lower():
+                    current_category = 'ai'
+            elif line and current_category:
+                custom_rules[current_category].append(line)
+    
+    return custom_rules
 
 def merge_rules_with_priority(custom_rules, third_party_rules):
     all_rules = custom_rules + third_party_rules
-    sorted_rules = sorted(set(all_rules))  # 先去重，再排序
+    sorted_rules = sorted(set(all_rules))
     return sorted_rules
 
 def save_rules_txt(rules, output_file):
+    file_path = os.path.join(get_script_dir(), output_file)
     try:
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             f.write("payload:\n")
             for rule in rules:
-                f.write(f"  {rule}\n")  # 添加两个空格
-        print(f"Generated {output_file} with {len(rules)} rules")
+                f.write(f"  {rule}\n")
+        print(f"Generated {file_path} with {len(rules)} rules")
     except IOError as e:
-        print(f"Error writing to {output_file}: {e}", file=sys.stderr)
+        print(f"Error writing to {file_path}: {e}", file=sys.stderr)
 
 def merge_proxy_and_ai_rules(proxy_rules, ai_rules, custom_proxy_rules):
     all_rules = custom_proxy_rules + proxy_rules + ai_rules
-    sorted_unique_rules = sorted(set(all_rules))  # 先去重，再排序
+    sorted_unique_rules = sorted(set(all_rules))
     return [rule if rule.endswith(',PROXY') else f"{rule},PROXY" for rule in sorted_unique_rules]
+
+def remove_duplicate_rules(proxy_rules, ai_rules):
+    return [rule for rule in proxy_rules if rule not in ai_rules]
+
+def process_rules(rule_sets, custom_rules):
+    all_processed_rules = custom_rules.copy()  # 保持自定义规则的原有格式
+    for content, file_format, comment in rule_sets:
+        rules = parse_rules(content, file_format)
+        if file_format == 'list':
+            processed_rules = [convert_list_to_txt(rule) for rule in rules if convert_list_to_txt(rule)]
+        else:
+            processed_rules = rules
+        all_processed_rules.extend(processed_rules)
+        print(f"Added {len(processed_rules)} rules from {comment}")
+
+    all_processed_rules = sorted(set(all_processed_rules))
+    return all_processed_rules
+
+def generate_merged_rules_conf(proxy_rules, ai_rules, custom_rules):
+    merged_conf_rules = merge_proxy_and_ai_rules(proxy_rules, ai_rules, custom_rules.get('proxy', []) + custom_rules.get('ai', []))
+    merged_conf_rules = sorted(set(merged_conf_rules))
+    
+    merged_conf_file = os.path.join(get_script_dir(), "merged_rules.conf")
+    try:
+        with open(merged_conf_file, 'w', encoding='utf-8') as f:
+            for rule in custom_rules.get('proxy', []) + custom_rules.get('ai', []):
+                f.write(f"{convert_txt_to_conf(rule)}\n")
+            for rule in merged_conf_rules:
+                if rule not in custom_rules.get('proxy', []) and rule not in custom_rules.get('ai', []):
+                    f.write(f"{rule}\n")
+        print(f"Generated {merged_conf_file} with {len(merged_conf_rules)} rules")
+    except IOError as e:
+        print(f"Error writing to {merged_conf_file}: {e}", file=sys.stderr)
 
 def main():
     rule_sets_config = {
@@ -124,71 +177,28 @@ def main():
         ],
     }
 
-    custom_proxy_rules = read_custom_rules('custom_proxy.txt')
-    custom_direct_rules = read_custom_rules('custom_direct.txt')
+    custom_rules = read_custom_rules('custom_rule.txt')
 
     print("Downloading all rules...")
     all_downloaded_rules = download_all_rules(rule_sets_config)
     print("All rules downloaded successfully.")
 
-    for output_name, rule_sets in all_downloaded_rules.items():
-        print(f"\nProcessing {output_name} rules:")
-        all_processed_rules = []
-        for content, file_format, comment in rule_sets:
-            rules = parse_rules(content, file_format)
-            if file_format == 'list':
-                processed_rules = [convert_list_to_txt(rule) for rule in rules if convert_list_to_txt(rule)]
-            else:
-                processed_rules = rules
-            all_processed_rules.extend(processed_rules)
-            print(f"Added {len(processed_rules)} rules from {comment}")
+    # 首先处理 AI 规则
+    ai_rules = process_rules(all_downloaded_rules.get("Ai", []), custom_rules.get('ai', []))
+    save_rules_txt(ai_rules, "Ai.txt")
 
-        all_processed_rules = sorted(set(all_processed_rules))  # 先去重，再排序
+    # 然后处理 Proxy 规则，并去除与 AI 重复的规则
+    proxy_rules = process_rules(all_downloaded_rules.get("Proxy", []), custom_rules.get('proxy', []))
+    proxy_rules = remove_duplicate_rules(proxy_rules, ai_rules)
+    save_rules_txt(proxy_rules, "Proxy.txt")
 
-        if not all_processed_rules:
-            print(f"No valid rules found for {output_name}. Skipping.")
-            continue
+    # 处理其他规则集
+    for output_name in ["Direct", "Reject"]:
+        rules = process_rules(all_downloaded_rules.get(output_name, []), custom_rules.get(output_name.lower(), []))
+        save_rules_txt(rules, f"{output_name}.txt")
 
-        if output_name == "Proxy":
-            merged_rules = merge_rules_with_priority(custom_proxy_rules, all_processed_rules)
-        elif output_name == "Direct":
-            merged_rules = merge_rules_with_priority(custom_direct_rules, all_processed_rules)
-        else:
-            merged_rules = all_processed_rules
-
-        print(f"Total merged rules count: {len(merged_rules)}")
-
-        txt_output_file = f"{output_name}.txt"
-        save_rules_txt(merged_rules, txt_output_file)
-
-    # Generate merged_rules.conf
-    print("\nProcessing Merged_rules.conf:")
-    proxy_rules = all_downloaded_rules.get("Proxy", [])
-    ai_rules = all_downloaded_rules.get("Ai", [])
-    
-    all_proxy_rules = []
-    all_ai_rules = []
-    
-    for content, file_format, _ in proxy_rules:
-        rules = parse_rules(content, file_format)
-        all_proxy_rules.extend(rules if file_format == 'list' else [convert_txt_to_conf(rule) for rule in rules])
-    
-    for content, file_format, _ in ai_rules:
-        rules = parse_rules(content, file_format)
-        all_ai_rules.extend(rules if file_format == 'list' else [convert_txt_to_conf(rule) for rule in rules])
-
-    merged_conf_rules = merge_proxy_and_ai_rules(all_proxy_rules, all_ai_rules, custom_proxy_rules)
-    merged_conf_rules = sorted(set(merged_conf_rules))  # 先去重，再排序
-    
-    merged_conf_file = "merged_rules.conf"
-    try:
-        with open(merged_conf_file, 'w', encoding='utf-8') as f:
-            for rule in merged_conf_rules:
-                f.write(f"{rule}\n")
-        print(f"Generated {merged_conf_file} with {len(merged_conf_rules)} rules")
-    except IOError as e:
-        print(f"Error writing to {merged_conf_file}: {e}", file=sys.stderr)
+    # 生成 merged_rules.conf
+    generate_merged_rules_conf(proxy_rules, ai_rules, custom_rules)
 
 if __name__ == "__main__":
     main()
-    

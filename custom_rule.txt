@@ -1,0 +1,30 @@
+# Direct rules
+  - '+.qnap.com'
+
+# Proxy rules
+  - '+.一分机场.com'
+  - '+.freembook.com'
+  - '+.superlib.net'
+  - '+.freembook.com'
+  - '+.ylibrary.org'
+  - '+.zhelper.net'
+  - '+.naritech.cn'
+  - '+.annas-archive.org'
+  - '+.iea-pvps.org'
+  - '+.v2rayssr.com'
+  - '+.huggingface.co'
+  - '+.lmsys.org'
+  - '+.naiko.cloud'
+  - '+.stripe.com'
+  - '+.poe.com'
+  - '+.bard.google.com'
+  - '+.gemini.google.com'
+  - '+.poe.com'
+
+# AI rules
+  - '+.claude.ai'
+  - '+.anthropic.com'
+  - '+.bing'
+  - '+.bing.com'
+
+  

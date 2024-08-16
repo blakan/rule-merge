@@ -62408,7 +62408,6 @@ payload:
   - '+.qmz5.com'
   - '+.qmzs.com'
   - '+.qnali.com'
-  - '+.qnap.com'
   - '+.qnapcn.com'
   - '+.qnbar.com'
   - '+.qncd.com'

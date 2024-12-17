@@ -13,6 +13,7 @@ payload:
   - '+.bing-shopping.microsoft-falcon.io'
   - '+.bing.com'
   - '+.bytedapm.com'
+  - '+.byteoversea.com'
   - '+.challenges.cloudflare.com'
   - '+.chatgpt.com'
   - '+.chatgpt.livekit.cloud'

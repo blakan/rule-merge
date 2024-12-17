@@ -26,5 +26,7 @@
   - '+.anthropic.com'
   - '+.bing'
   - '+.bing.com'
+  - '+.byteoversea.com'
+
 
   

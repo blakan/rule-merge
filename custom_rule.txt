@@ -1,5 +1,6 @@
 # Direct rules
   - '+.qnap.com'
+  - '+.longshine.com'
 
 # Proxy rules
   - '+.一分机场.com'

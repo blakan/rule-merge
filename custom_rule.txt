@@ -28,6 +28,6 @@
   - '+.bing'
   - '+.bing.com'
   - '+.byteoversea.com'
-
+  - '+.grok.com'
 
   

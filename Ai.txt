@@ -28,6 +28,7 @@ payload:
   - '+.edgeservices.bing.com'
   - '+.events.statsigapi.net'
   - '+.featuregates.org'
+  - '+.grok.com'
   - '+.host.livekit.cloud'
   - '+.ibytedtos.com'
   - '+.ibyteimg.com'

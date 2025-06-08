@@ -85,7 +85,6 @@ payload:
   - 'copilot.microsoft.com'
   - 'gateway.bingviz.microsoft.net'
   - 'gateway.bingviz.microsoftapp.net'
-  - 'gemini.google.com'
   - 'in.appcenter.ms'
   - 'location.microsoft.com'
   - 'odc.officeapps.live.com'

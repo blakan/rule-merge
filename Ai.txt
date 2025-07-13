@@ -21,6 +21,7 @@ payload:
   - '+.challenges.cloudflare.com'
   - '+.chatgpt.com'
   - '+.chatgpt.livekit.cloud'
+  - '+.cici.com'
   - '+.ciciai.com'
   - '+.ciciaicdn.com'
   - '+.claude.ai'

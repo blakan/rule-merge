@@ -26,6 +26,7 @@ payload:
   - '+.ciciaicdn.com'
   - '+.claude.ai'
   - '+.client-api.arkoselabs.com'
+  - '+.dola.com'
   - '+.edgeservices.bing.com'
   - '+.events.statsigapi.net'
   - '+.featuregates.org'

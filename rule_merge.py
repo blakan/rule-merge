@@ -185,8 +185,10 @@ def main():
             ("https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/proxy.txt", "Loyalsoldier Proxy"),
         ],
         "Ai": [
+            ("https://github.com/ACL4SSR/ACL4SSR/blob/master/Clash/Ruleset/AI.list", "ACL4SSR AI"), 
             ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Copilot/Copilot.list", "blackmatrix7 Copilot"),
             ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.list", "blackmatrix7 OpenAI"),    
+            ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml", "blackmatrix7 Gemini"),    
             ("https://raw.githubusercontent.com/szkane/ClashRuleSet/main/Clash/Ruleset/CiciAi.list", "szkane CiciAi"),   
         ],
         "Direct": [
@@ -219,3 +221,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

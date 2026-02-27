@@ -1,6 +1,8 @@
 import requests
 import yaml
 import os
+import re
+import ipaddress
 import sys
 from collections import OrderedDict
 from urllib.parse import urlparse
@@ -43,7 +45,7 @@ def download_all_rules(rule_sets_config):
             for idx, (url, comment) in enumerate(urls):
                 future = executor.submit(download_rules, url)
                 future_to_meta[future] = (output_name, idx, url, comment)
-
+            # If already in clash/acl style like DOMAIN,DOMAIN-SUFFIX,DOMAIN-KEYWORD -> try to convert
         for future in concurrent.futures.as_completed(future_to_meta):
             output_name, idx, url, comment = future_to_meta[future]
             try:
@@ -120,21 +122,34 @@ def parse_rules(content, file_format):
             # attempt to parse YAML content; support common layouts
             try:
                 parsed = yaml.safe_load(content)
-                # if YAML is a dict with 'payload' or similar
+                items = []
+                # If YAML is a dict try common keys first
                 if isinstance(parsed, dict):
-                    # try common keys
                     for key in ('payload', 'rules', 'data'):
                         if key in parsed and isinstance(parsed[key], list):
-                            return [str(item).strip() for item in parsed[key] if str(item).strip()]
-                    # if dict values are strings list-like, flatten
-                    items = []
+                            for it in parsed[key]:
+                                txt = convert_yaml_item_to_txt(it)
+                                if txt:
+                                    items.append(txt)
+                            if items:
+                                return items
+                    # otherwise flatten any list values found in the dict
                     for v in parsed.values():
                         if isinstance(v, list):
-                            items.extend([str(i).strip() for i in v if str(i).strip()])
+                            for it in v:
+                                txt = convert_yaml_item_to_txt(it)
+                                if txt:
+                                    items.append(txt)
                     if items:
                         return items
-                elif isinstance(parsed, list):
-                    return [str(item).strip() for item in parsed if str(item).strip()]
+                # If YAML is a list, convert each element
+                if isinstance(parsed, list):
+                    for it in parsed:
+                        txt = convert_yaml_item_to_txt(it)
+                        if txt:
+                            items.append(txt)
+                    if items:
+                        return items
             except Exception:
                 # fallback to line-based parsing
                 lines = content.splitlines()
@@ -163,6 +178,76 @@ def convert_list_to_txt(rule):
         domain_part = parts[1].strip() if len(parts) > 1 else parts[0].strip()
         if domain_part:
             return f"- '{domain_part}'"
+    return None
+
+def convert_yaml_item_to_txt(item):
+    """Convert a YAML-parsed item into the same txt-list form we use for .list items.
+
+    Returns strings like "- 'example.com'" or "- '+.example.com'" or None when nothing useful.
+    """
+    if item is None:
+        return None
+    # dict/list handling: try to extract a meaningful string value
+    if isinstance(item, dict):
+        # try common keys that may contain domain-like values
+        for key in ('value', 'domain', 'host', 'rule', 'payload', 'name', 'pattern'):
+            if key in item and isinstance(item[key], str) and item[key].strip():
+                return convert_yaml_item_to_txt(item[key].strip())
+        # fallback: try any string value in the dict
+        for v in item.values():
+            if isinstance(v, str) and v.strip():
+                return convert_yaml_item_to_txt(v.strip())
+        return None
+    if isinstance(item, (list, tuple)):
+        for v in item:
+            res = convert_yaml_item_to_txt(v)
+            if res:
+                return res
+        return None
+
+    # string handling
+    s = str(item).strip()
+    if not s:
+        return None
+
+    # If the YAML item already contains an ACL/Clash style rule, convert DOMAIN-* / DOMAIN-KEYWORD to txt form.
+    # Keep IP-CIDR/IP-ASN as-is so they can be written to merged conf later.
+    up = s.upper()
+    if up.startswith(('DOMAIN,', 'DOMAIN-SUFFIX,', 'DOMAIN-KEYWORD,')):
+        c = convert_list_to_txt(s)
+        if c:
+            return c
+        # fallback: if conversion failed, continue to other heuristics
+    if up.startswith(('IP-CIDR,', 'IP-ASN,')):
+        return s
+
+    # if looks like comma-separated rule (DOMAIN, ...), reuse convert_list_to_txt
+    if ',' in s:
+        c = convert_list_to_txt(s)
+        if c:
+            return c
+
+    # wildcard or prefix forms
+    if s.startswith('+.'):
+        return f"- '+.{s[2:]}'"
+    if s.startswith('*.'):
+        return f"- '+.{s[2:]}'"
+    if s.startswith('.'):
+        return f"- '+.{s[1:]}'"
+
+    # try to parse as URL to extract hostname
+    try:
+        parsed = urlparse(s)
+        if parsed.hostname:
+            return f"- '{parsed.hostname}'"
+    except Exception:
+        pass
+
+    # fallback: split by non-alphanumeric/dot chars and take last token
+    parts = re.split(r'[^0-9a-zA-Z\.\-]+', s)
+    for p in reversed(parts):
+        if p:
+            return f"- '{p}'"
     return None
 
 def convert_txt_to_conf(rule):
@@ -228,8 +313,19 @@ def normalize_rule(rule):
         return f"domain-suffix,{r[2:].lower()}"
 
     # if it's a bare domain or contains only domain-like chars
-    # fallback to domain-suffix for bare words
     cleaned = r.lower()
+    # if it looks like an IP or CIDR, accept as-is (use ipaddress)
+    try:
+        ipaddress.ip_network(cleaned, strict=False)
+        return f"ip,{cleaned}"
+    except Exception:
+        pass
+
+    # require at least one dot for domain forms; otherwise treat as invalid
+    if '.' not in cleaned:
+        return ''
+
+    # finally treat as domain-suffix by default
     return f"domain-suffix,{cleaned}"
 
 def get_file_format(url):
@@ -289,15 +385,24 @@ def process_rules(rule_sets, custom_rules, rule_type=None, verbose=True):
     If rule_type is provided, include it in log outputs and print a per-type summary.
     """
     # show custom rules count and internal duplicates (if any) so user can see how many were pre-added
-    # keep original-rule list for output
-    all_processed_rules = list(custom_rules) if custom_rules else []
+    # We'll produce an order-preserving unique list based on normalized keys.
+    result_rules = []  # final ordered payload rules (original representations)
     # normalized set for dedupe checks (custom is baseline)
     existing_norm = set()
     if custom_rules:
         for cr in custom_rules:
             n = normalize_rule(cr)
+            # only include valid domain/ip forms into the baseline
             if n:
                 existing_norm.add(n)
+                # include custom rule in payload only if it's a domain/domain-suffix (not domain-keyword or ip/asn)
+                if not n.startswith('domain-keyword') and not n.startswith('ip,'):
+                    # avoid duplicates among custom rules themselves
+                    if n not in existing_norm:
+                        result_rules.append(cr)
+                    else:
+                        # if already present (very rare since we just added), skip
+                        pass
     try:
         custom_count_raw = len(custom_rules) if custom_rules else 0
         custom_count_unique = len(set(custom_rules)) if custom_rules else 0
@@ -321,6 +426,7 @@ def process_rules(rule_sets, custom_rules, rule_type=None, verbose=True):
     total_raw_download = custom_count_raw
     # total_processed_download: number of items actually participating in dedupe (custom unique + processed items from sources)
     total_processed_download = len(existing_norm)
+
     for content, file_format, comment, url in rule_sets:
         rules = parse_rules(content, file_format)
         original_count = len(rules)
@@ -329,41 +435,70 @@ def process_rules(rule_sets, custom_rules, rule_type=None, verbose=True):
             processed_rules = [convert_list_to_txt(rule) for rule in rules if convert_list_to_txt(rule)]
         else:
             processed_rules = rules
-        n_processed = len(processed_rules)
-        # count how many are actually new vs duplicates using normalized values
+
+        # For payload outputs we do NOT include IP-CIDR/IP-ASN entries; keep those only for conf output.
+        ignored_ip_count = 0
+        ignored_keyword_count = 0
+        invalid_count = 0
+
+        # track per-source counts
         unique_new = 0
         duplicates = 0
-        norms = []
-        for r in processed_rules:
-            nr = normalize_rule(r)
-            norms.append(nr)
-            if nr and nr not in existing_norm:
+
+        for pr in processed_rules:
+            if not pr:
+                continue
+            up = pr.upper()
+            # ignore IP entries completely for payload
+            if up.startswith('IP-CIDR') or up.startswith('IP-ASN'):
+                ignored_ip_count += 1
+                continue
+
+            # convert and normalize
+            nr = normalize_rule(pr)
+            if not nr:
+                invalid_count += 1
+                continue
+
+            # exclude DOMAIN-KEYWORD from payload (keep in conf only)
+            if nr.startswith('domain-keyword'):
+                ignored_keyword_count += 1
+                continue
+
+            # if not seen before, include in ordered result and mark as seen
+            if nr not in existing_norm:
+                result_rules.append(pr)
+                existing_norm.add(nr)
                 unique_new += 1
             else:
                 duplicates += 1
-        # extend output list and update normalized baseline
-        all_processed_rules.extend(processed_rules)
-        for nr in norms:
-            if nr:
-                existing_norm.add(nr)
-        added = unique_new
+
         # keep total_added as the total number of processed items (去重前总数) for summary
-        total_added += n_processed
+        total_added += len(processed_rules)
+
         if verbose:
+            notes = []
+            if ignored_ip_count:
+                notes.append(f"忽略 IP/CIDR/ASN {ignored_ip_count} 条")
+            if ignored_keyword_count:
+                notes.append(f"忽略 DOMAIN-KEYWORD {ignored_keyword_count} 条")
+            if invalid_count:
+                notes.append(f"忽略 无效条目 {invalid_count} 条")
+            note_str = f"，{'，'.join(notes)}" if notes else ""
             if rule_type:
                 if duplicates > 0:
-                    print(f"已为 {rule_type} 添加 {added} 条规则（去重{duplicates}条），来源：{comment} (原始: {original_count})")
+                    print(f"已为 {rule_type} 添加 {unique_new} 条规则（去重{duplicates}条）{note_str}，来源：{comment} (原始: {original_count})")
                 else:
-                    print(f"已为 {rule_type} 添加 {added} 条规则，来源：{comment} (原始: {original_count})")
+                    print(f"已为 {rule_type} 添加 {unique_new} 条规则{note_str}，来源：{comment} (原始: {original_count})")
             else:
                 if duplicates > 0:
-                    print(f"已添加 {added} 条规则（去重{duplicates}条），来源：{comment} (原始: {original_count})")
+                    print(f"已添加 {unique_new} 条规则（去重{duplicates}条）{note_str}，来源：{comment} (原始: {original_count})")
                 else:
-                    print(f"已添加 {added} 条规则，来源：{comment} (原始: {original_count})")
+                    print(f"已添加 {unique_new} 条规则{note_str}，来源：{comment} (原始: {original_count})")
 
     # final unique count is based on normalized baseline
     unique_count = len(existing_norm)
-    return sorted(set(all_processed_rules))
+    return result_rules
 
 def process_rules_for_conf(rule_sets, custom_rules, rule_type=None, verbose=True):
     """
@@ -455,12 +590,15 @@ def process_rules_for_conf(rule_sets, custom_rules, rule_type=None, verbose=True
     unique = sorted(set(all_processed_rules))
     # total_dedup is based on processed (normalized) items
     total_dedup = total_processed_download - len(existing_norm)
-    # 不再打印按来源累计去重一致性警告或每类型汇总（按用户要求），仅返回唯一规则集合
+    # 不再打印按来源累计去重一致性警告或每类型汇总（按用户要求）仅返回唯一规则集合
     return unique
 
 def format_rule(rule):
     if rule.startswith("- '+.") or rule.startswith("- '"):
         return convert_txt_to_conf(rule)
+    # preserve IP and ASN entries
+    if rule.upper().startswith(('IP-CIDR,', 'IP-ASN,')):
+        return rule
     elif not (rule.startswith("DOMAIN-SUFFIX,") or rule.startswith("DOMAIN,") or rule.startswith("DOMAIN-KEYWORD,")):
         return f"DOMAIN-SUFFIX,{rule},PROXY"
     else:

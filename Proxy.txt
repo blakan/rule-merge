@@ -1,5 +1,4 @@
 payload:
-  - '+.一分机场.com'
   - '+.freembook.com'
   - '+.superlib.net'
   - '+.ylibrary.org'
@@ -13,8 +12,6 @@ payload:
   - '+.naiko.cloud'
   - '+.stripe.com'
   - '+.poe.com'
-  - '+.bard.google.com'
-  - '+.gemini.google.com'
   - '1password.drift.click'
   - '3dns-1.adobe.com'
   - '3dns-2.adobe.com'
@@ -16091,7 +16088,6 @@ payload:
   - '+.msft.net'
   - '+.msftauth.net'
   - '+.msftauthimages.net'
-  - '+.msftconnecttest.com'
   - '+.msfteducation.ca'
   - '+.msftncsi.com'
   - '+.msftnet.org'

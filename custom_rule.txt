@@ -1,9 +1,9 @@
 # Direct rules
   - '+.qnap.com'
   - '+.longshine.com'
+  - '+.msftconnecttest.com'
 
 # Proxy rules
-  - '+.一分机场.com'
   - '+.freembook.com'
   - '+.superlib.net'
   - '+.freembook.com'
@@ -18,9 +18,6 @@
   - '+.naiko.cloud'
   - '+.stripe.com'
   - '+.poe.com'
-  - '+.bard.google.com'
-  - '+.gemini.google.com'
-  - '+.poe.com'
 
 # AI rules
   - '+.claude.ai'
@@ -29,5 +26,7 @@
   - '+.bing.com'
   - '+.byteoversea.com'
   - '+.grok.com'
+  - '+.bard.google.com'
+  - '+.gemini.google.com'
 
   

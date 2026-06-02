@@ -28,5 +28,7 @@
   - '+.grok.com'
   - '+.bard.google.com'
   - '+.gemini.google.com'
+  - '+.gemini.gstatic.com'
+
 
   

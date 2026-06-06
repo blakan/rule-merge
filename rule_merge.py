@@ -606,7 +606,8 @@ def main():
              ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Copilot/Copilot.list", "blackmatrix7 Copilot"),
              ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.list", "blackmatrix7 OpenAI"),    
              ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml", "blackmatrix7 Gemini"),    
-             ("https://raw.githubusercontent.com/szkane/ClashRuleSet/main/Clash/Ruleset/CiciAi.list", "szkane CiciAi"),   
+             ("https://raw.githubusercontent.com/szkane/ClashRuleSet/main/Clash/Ruleset/CiciAi.list", "szkane CiciAi"), 
+             ("https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.yaml", "MetaCubeX openai"), 
          ],
          "Direct": [
              ("https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt", "Loyalsoldier Direct"),

@@ -131,3 +131,8 @@ payload:
   - '+.ibyteimg.com'
   - '+.snapkit.com'
   - '+.pangle.io'
+  - '+.chat.com'
+  - '+.crixet.com'
+  - '+.oaistatsig.com'
+  - '+.openai.com.cdn.cloudflare.net'
+  - 'o33249.ingest.sentry.io'

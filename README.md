@@ -1,5 +1,5 @@
 ## Fixed URLs
-更新于北京时间 2026年07月06日00时13分47秒
+更新于北京时间 2026年07月13日00时02分37秒
 - Proxy.txt: https://blakan.github.io/rule-merge/Proxy.txt
 - Direct.txt: https://blakan.github.io/rule-merge/Direct.txt
 - Reject.txt: https://blakan.github.io/rule-merge/Reject.txt

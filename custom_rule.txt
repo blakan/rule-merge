@@ -30,9 +30,13 @@
   - '+.bing.com'
   - '+.byteoversea.com'
   - '+.grok.com'
-  - '+.bard.google.com'
-  - '+.gemini.google.com'
-  - '+.gemini.gstatic.com'
-
+  - '+.google.com'
+  - '+.googleapis.com'
+  - '+.gstatic.com'
+  - '+.googleusercontent.com'
+  - '+.googlevideo.com'
+  - '+.ggpht.com'
+  - '+.google-analytics.com'
+  - '+.googletagmanager.com'
 
   

@@ -657,8 +657,15 @@ def main():
 
     # 处理并保存其他类型规则文件
     for output_name in ["Ai", "Direct", "Reject"]:
-        rules = process_rules(all_downloaded_rules.get(output_name, []), custom_rules, rule_type=output_name)
-        save_rules_txt(rules, f"{output_name}.txt")
+    downloaded = process_rules(all_downloaded_rules.get(output_name, []), custom_rules, rule_type=output_name)
+    custom_of_type = custom_rules.get(output_name.lower(), [])
+    merged = custom_of_type + downloaded
+    normalized = {}
+    for rule in merged:
+        norm = normalize_rule(rule)
+        if norm not in normalized:
+            normalized[norm] = rule
+    save_rules_txt(list(normalized.values()), f"{output_name}.txt")
 
 if __name__ == "__main__":
     main()

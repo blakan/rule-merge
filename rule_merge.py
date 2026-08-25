@@ -655,17 +655,17 @@ def main():
     # 生成 merged_rules.conf
     generate_merged_rules_conf(all_downloaded_rules, custom_rules)
 
-    # 处理并保存其他类型规则文件
+    # 处理并保存其他类型规则文件（自定义规则前置注入 + 去重，与 Proxy 一致）
     for output_name in ["Ai", "Direct", "Reject"]:
-    downloaded = process_rules(all_downloaded_rules.get(output_name, []), custom_rules, rule_type=output_name)
-    custom_of_type = custom_rules.get(output_name.lower(), [])
-    merged = custom_of_type + downloaded
-    normalized = {}
-    for rule in merged:
-        norm = normalize_rule(rule)
-        if norm not in normalized:
-            normalized[norm] = rule
-    save_rules_txt(list(normalized.values()), f"{output_name}.txt")
+        downloaded = process_rules(all_downloaded_rules.get(output_name, []), custom_rules, rule_type=output_name)
+        custom_of_type = custom_rules.get(output_name.lower(), [])
+        merged = custom_of_type + downloaded
+        normalized = {}
+        for rule in merged:
+            norm = normalize_rule(rule)
+            if norm not in normalized:
+                normalized[norm] = rule
+        save_rules_txt(list(normalized.values()), f"{output_name}.txt")
 
 if __name__ == "__main__":
     main()

@@ -18,6 +18,10 @@
   - '+.naiko.cloud'
   - '+.stripe.com'
   - '+.poe.com'
+  - '+.felo.ai'
+  - '+.reportapi.eastmoney.com'
+  - '+.ai-saas.eastmoney.com'
+  - '+.shlii.io'
 
 # AI rules
   - '+.claude.ai'

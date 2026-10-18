@@ -144,6 +144,7 @@ payload:
   - '+.chatgpt.site'
   - '+.crixet.com'
   - '+.oaistatsig.com'
+  - '+.openai.org'
   - '+.chat.com'
   - '+.openai.com.cdn.cloudflare.net'
   - 'o33249.ingest.sentry.io'

@@ -148,4 +148,5 @@ payload:
   - '+.chat.com'
   - '+.openai.com.cdn.cloudflare.net'
   - 'o33249.ingest.sentry.io'
+  - 'o33249.ingest.us.sentry.io'
   - 'openai.qualtrics.com'
